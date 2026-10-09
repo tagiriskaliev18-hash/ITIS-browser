@@ -5,7 +5,7 @@ import time
 from PyQt6.QtCore import QUrl, Qt, pyqtSignal, QThread
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                              QWidget, QLineEdit, QPushButton, QTabWidget, QSplitter,
-                             QTextEdit, QLabel, QListWidget, QProgressBar)
+                             QTextEdit, QLabel, QListWidget, QProgressBar, QMenu)
 from PyQt6.QtGui import QIcon, QAction, QFont
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
@@ -36,6 +36,7 @@ class CorporateMonitor:
 # ==========================================
 import json
 import requests as http_requests
+import continuity  # MindKit: Handoff и ИИ-ядро экосистемы MindTagSystem
 
 class AILogicThread(QThread):
     response_ready = pyqtSignal(str)
@@ -103,6 +104,12 @@ class AILogicThread(QThread):
             except Exception:
                 pass  # Fall through to fallback
             
+            # Запасной вариант экосистемы: шлюз AI Duo или локальная Ollama через MindKit
+            reply = continuity.ask(messages)
+            if reply:
+                self.response_ready.emit(reply)
+                return
+
             # Fallback: Pollinations AI (free, no API key)
             try:
                 resp = http_requests.post(
@@ -166,6 +173,9 @@ class WebTab(QWidget):
         self.url_bar = QLineEdit()
         self.url_bar.setPlaceholderText("Поиск ITIS или введите URL...")
         self.ask_ai_btn = QPushButton("✨ ИИ-Анализ")
+        # Handoff: вкладка на другое своё устройство и ссылки, пришедшие с них
+        self.handoff_btn = QPushButton("⇄")
+        self.handoff_btn.setToolTip("Handoff: продолжить на другом устройстве (MindTagSystem)")
 
         # Style toolbar buttons
         btn_style = """
@@ -176,6 +186,7 @@ class WebTab(QWidget):
         self.back_btn.setStyleSheet(btn_style)
         self.forward_btn.setStyleSheet(btn_style)
         self.reload_btn.setStyleSheet(btn_style)
+        self.handoff_btn.setStyleSheet(btn_style)
         
         # Style URL bar (3D glassmorphism)
         self.url_bar.setStyleSheet("""
@@ -206,6 +217,7 @@ class WebTab(QWidget):
         self.toolbar.addWidget(self.forward_btn)
         self.toolbar.addWidget(self.reload_btn)
         self.toolbar.addWidget(self.url_bar, 1)
+        self.toolbar.addWidget(self.handoff_btn)
         self.toolbar.addWidget(self.ask_ai_btn)
 
         self.layout.addWidget(self.toolbar_container)
@@ -237,10 +249,35 @@ class WebTab(QWidget):
         self.webview.loadFinished.connect(self.load_finished)
         
         self.ask_ai_btn.clicked.connect(self.trigger_ai)
+        self.handoff_btn.clicked.connect(self.handoff_menu)
 
         # Start URL
         start_url = QUrl.fromLocalFile(os.path.abspath("start_page.html")).toString()
         self.navigate_to(start_url)
+
+    def handoff_menu(self):
+        menu = QMenu(self)
+        menu.setStyleSheet("QMenu { background: #16161D; color: #E2E2E2; border: 1px solid #282833; padding: 6px; }"
+                           "QMenu::item { padding: 6px 16px; border-radius: 6px; }"
+                           "QMenu::item:selected { background: #0A84FF; }")
+        send = menu.addAction("Отправить вкладку на мои устройства")
+        incoming = continuity.incoming()
+        if incoming:
+            menu.addSeparator()
+            for act in incoming:
+                title = (act.get("title") or act["url"])[:60]
+                item = menu.addAction(f"⇄ {title} — с «{act.get('from', '?')}»")
+                item.triggered.connect(lambda _=False, u=act["url"]: self.navigate_to(u))
+        chosen = menu.exec(self.handoff_btn.mapToGlobal(self.handoff_btn.rect().bottomLeft()))
+        if chosen is send:
+            url = self.webview.url().toString()
+            if url.startswith("file://"):
+                self.handoff_btn.setToolTip("Стартовую страницу отправлять не нужно")
+                return
+            msg = continuity.send_url(url, self.webview.title())
+            self.handoff_btn.setToolTip(msg)
+            if self.window() and hasattr(self.window(), "ai_append"):
+                self.window().ai_append("Система", msg)
 
     def navigate(self):
         url = self.url_bar.text()
