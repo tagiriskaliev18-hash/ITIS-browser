@@ -51,7 +51,7 @@ class AILogicThread(QThread):
             context = self.context_html[:1500] if self.context_html else ""
             
             messages = [
-                {"role": "system", "content": "Ты — ИИ-ассистент встроенный в браузер ITIS. Ты видишь текст текущей веб-страницы пользователя. Отвечай кратко и по делу на русском языке. Если контекст страницы пуст — просто помоги пользователю с его вопросом."},
+                {"role": "system", "content": "Ты — умный ИИ-агент браузера ITIS (как HeyClicky). Ты можешь УПРАВЛЯТЬ страницей. Чтобы кликнуть по видео, кнопке или ссылке, напиши: [CLICK: текст]. Для скролла вниз: [SCROLL_DOWN], вверх: [SCROLL_UP]. Отвечай на русском языке. Если просят включить видео или перейти куда-то — выдавай [CLICK: название]."},
                 {"role": "user", "content": f"Содержимое страницы:\n{context}\n\nМой вопрос: {self.query}" if context else self.query}
             ]
             
@@ -454,7 +454,13 @@ class ITISBrowserApp(QMainWindow):
     def on_ai_response(self, response):
         import re
         pointers = re.findall(r'\[POINTER:\s*(.*?)\s*\|\s*(.*?)\]', response)
-        clean_response = re.sub(r'\[POINTER:.*?\]', '', response).strip()
+        clicks = re.findall(r'\[CLICK:\s*(.*?)\]', response)
+        scroll_down = '[SCROLL_DOWN]' in response
+        scroll_up = '[SCROLL_UP]' in response
+        
+        clean_response = re.sub(r'\[POINTER:.*?\]', '', response)
+        clean_response = re.sub(r'\[CLICK:.*?\]', '', clean_response)
+        clean_response = clean_response.replace('[SCROLL_DOWN]', '').replace('[SCROLL_UP]', '').strip()
         
         if clean_response:
             self.ai_append("ИИ", clean_response)
@@ -464,7 +470,35 @@ class ITISBrowserApp(QMainWindow):
         self.ai_send_btn.setEnabled(True)
         
         current_tab = self.tabs.currentWidget()
-        if current_tab and pointers:
+        if not current_tab: return
+        
+        if scroll_down:
+            current_tab.webview.page().runJavaScript("window.scrollBy({ top: window.innerHeight * 0.8, left: 0, behavior: 'smooth' });")
+        if scroll_up:
+            current_tab.webview.page().runJavaScript("window.scrollBy({ top: -window.innerHeight * 0.8, left: 0, behavior: 'smooth' });")
+            
+        if clicks:
+            for text in clicks:
+                text_clean = text.replace('"', '\"').replace("'", "\'")
+                js_click = f"""
+                (function() {{
+                    let text = "{text_clean}".toLowerCase();
+                    let elements = Array.from(document.querySelectorAll('a, button, [role="button"], span, div, h1, h2, h3, h4, h5, h6, yt-formatted-string'));
+                    for (let el of elements) {{
+                        if (el.innerText && el.innerText.toLowerCase().includes(text) && el.offsetParent !== null) {{
+                            el.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                            el.style.border = '3px solid #FF3366';
+                            el.style.boxShadow = '0 0 15px #FF3366';
+                            setTimeout(() => el.click(), 800);
+                            return true;
+                        }}
+                    }}
+                    return false;
+                }})();
+                """
+                current_tab.webview.page().runJavaScript(js_click)
+
+        if pointers:
             for selector, text in pointers:
                 # Escape quotes
                 selector = selector.replace('"', '\\"')
