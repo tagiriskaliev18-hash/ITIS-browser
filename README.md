@@ -11,7 +11,8 @@
 - **Боковая панель ИИ-агента** в духе HeyClicky. Агент получает адрес и текст страницы, отвечает по-русски и управляет страницей командами:
   - `[CLICK: текст]` — нажать на ссылку, кнопку или видео с этим текстом;
   - `[SCROLL_DOWN]` и `[SCROLL_UP]` — прокрутить страницу.
-- **Две модели с запасным вариантом.** Основной провайдер — OpenAI-совместимый endpoint; если он не ответил, запрос уходит к бесплатному Pollinations.
+- **Модели с запасными вариантами.** Основной провайдер — OpenAI-совместимый endpoint; если он не ответил, запрос уходит в ИИ-ядро экосистемы (шлюз AI Duo или локальная Ollama через MindKit), затем к бесплатному Pollinations.
+- **Handoff (кнопка ⇄).** Открытая вкладка отправляется на другие свои устройства, а ссылки, пришедшие с них, открываются одним кликом. Работает через MindLink из [MindKit](https://github.com/tagiriskaliev18-hash/MindTagSystem/blob/main/docs/MINDKIT.md).
 - **Корпоративный монитор** (`CorporateMonitor`): блокировка выбранных доменов и журнал посещений.
 
 ## Запуск
@@ -23,11 +24,20 @@ pip install PyQt6 PyQt6-WebEngine requests
 python main.py
 ```
 
+Для Handoff и ИИ-ядра экосистемы (необязательно):
+
+```bash
+pip install "mindkit[full] @ git+https://github.com/tagiriskaliev18-hash/MindTagSystem"
+mindkit link init          # на первом устройстве; на остальных mindkit link join КЛЮЧ
+mindkit link autostart on
+```
+
 ## Устройство
 
 | Файл | Назначение |
 |---|---|
 | `main.py` | Приложение: окно, вкладки, ИИ-агент (`AILogicThread`), корпоративный монитор |
+| `continuity.py` | Связь с экосистемой через MindKit: Handoff вкладок и ИИ-ядро (без MindKit отключается) |
 | `start_page.html` | Стартовая страница ITIS Search |
 | `patch_*.py` | Скрипты, которыми вносились правки в `main.py` по ходу разработки |
 | `test_api.py`, `test_api2.py` | Проверка доступности ИИ-провайдера |
