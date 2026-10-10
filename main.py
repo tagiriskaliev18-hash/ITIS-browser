@@ -2,13 +2,14 @@ import sys
 import os
 import threading
 import time
-from PyQt6.QtCore import QUrl, Qt, pyqtSignal, QThread
+from PyQt6.QtCore import QUrl, Qt, pyqtSignal, QThread, QSize
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                              QWidget, QLineEdit, QPushButton, QTabWidget, QSplitter,
                              QTextEdit, QLabel, QListWidget, QProgressBar, QMenu)
 from PyQt6.QtGui import QIcon, QAction, QFont
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
+from mind import mind_fx  # единый стиль Mind: иконки с градиентом, bounce, перелив
 
 # ==========================================
 # CORPORATE MONITORING & RESTRICTION SYSTEM
@@ -127,10 +128,10 @@ class AILogicThread(QThread):
             except Exception:
                 pass
             
-            self.response_ready.emit("⚠ ИИ-сервисы временно недоступны. Попробуйте через минуту.")
+            self.response_ready.emit("ИИ-сервисы временно недоступны. Попробуйте через минуту.")
             
         except Exception as e:
-            self.response_ready.emit(f"⚠ Ошибка: {str(e)}")
+            self.response_ready.emit(f"Ошибка: {str(e)}")
 
 
 # ==========================================
@@ -162,56 +163,66 @@ class WebTab(QWidget):
         # Toolbar Container
         self.toolbar_container = QWidget()
         self.toolbar_container.setFixedHeight(55) # Fixes the squished layout issue
-        self.toolbar_container.setStyleSheet("background-color: #16161D; border-bottom: 1px solid #282833;")
+        self.toolbar_container.setStyleSheet("background-color: #0f0f1a; border-bottom: 1px solid #1c1c2e;")
         self.toolbar = QHBoxLayout(self.toolbar_container)
         self.toolbar.setContentsMargins(12, 10, 12, 10)
         self.toolbar.setSpacing(10)
 
-        self.back_btn = QPushButton("◀")
-        self.forward_btn = QPushButton("▶")
-        self.reload_btn = QPushButton("↻")
+        # Навигация — иконки Mind вместо символов
+        self.back_btn = QPushButton()
+        self.back_btn.setIcon(mind_fx.icon("back"))
+        self.back_btn.setToolTip("Назад")
+        self.forward_btn = QPushButton()
+        self.forward_btn.setIcon(mind_fx.icon("chevron-right"))
+        self.forward_btn.setToolTip("Вперёд")
+        self.reload_btn = QPushButton()
+        self.reload_btn.setIcon(mind_fx.icon("refresh"))
+        self.reload_btn.setToolTip("Обновить")
         self.url_bar = QLineEdit()
         self.url_bar.setPlaceholderText("Поиск ITIS или введите URL...")
-        self.ask_ai_btn = QPushButton("✨ ИИ-Анализ")
+        self.ask_ai_btn = QPushButton("ИИ-Анализ")
+        self.ask_ai_btn.setIcon(mind_fx.icon("sparkles", white=True))
         # Handoff: вкладка на другое своё устройство и ссылки, пришедшие с них
-        self.handoff_btn = QPushButton("⇄")
+        self.handoff_btn = QPushButton()
+        self.handoff_btn.setIcon(mind_fx.icon("devices"))
         self.handoff_btn.setToolTip("Handoff: продолжить на другом устройстве (MindTagSystem)")
 
         # Style toolbar buttons
+        # Кнопки-иконки Mind: прозрачные, мягкая фиолетово-синяя подсветка и пружина
         btn_style = """
-            QPushButton { background: transparent; color: #A0A0B0; border: none; font-size: 14px; padding: 6px 10px; border-radius: 6px; }
-            QPushButton:hover { background: rgba(255, 255, 255, 0.05); color: #FFFFFF; }
-            QPushButton:pressed { background: rgba(10, 132, 255, 0.2); color: #FFFFFF; }
+            QPushButton { background: transparent; color: #A0A0B0; border: none; padding: 6px 8px; border-radius: 10px; }
+            QPushButton:hover { background: rgba(155, 93, 229, 0.16); color: #FFFFFF; }
+            QPushButton:pressed { background: rgba(91, 141, 238, 0.28); color: #FFFFFF; }
         """
-        self.back_btn.setStyleSheet(btn_style)
-        self.forward_btn.setStyleSheet(btn_style)
-        self.reload_btn.setStyleSheet(btn_style)
-        self.handoff_btn.setStyleSheet(btn_style)
+        for b in (self.back_btn, self.forward_btn, self.reload_btn, self.handoff_btn):
+            b.setStyleSheet(btn_style)
+            b.setIconSize(QSize(20, 20))
+            mind_fx.bounce_on_hover(b)
         
-        # Style URL bar (3D glassmorphism)
+        # Адресная строка: объёмное стекло, фокус — синяя грань Mind
         self.url_bar.setStyleSheet("""
             QLineEdit { 
-                background: linear-gradient(180deg, #1A1A24 0%, #12121A 100%); 
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1a1a2a, stop:1 #12121c);
                 color: #E2E2E2; 
                 border: 1px solid rgba(255, 255, 255, 0.05);
                 border-top: 1px solid rgba(255, 255, 255, 0.15);
                 padding: 8px 16px; 
                 border-radius: 16px; font-size: 13px; font-family: 'Segoe UI';
             }
-            QLineEdit:focus { border: 1px solid #0A84FF; background: #1C1C26; }
+            QLineEdit:focus { border: 1px solid #5b8dee; background: #1c1c2e; }
         """)
         
-        # 3D glowing primary button
-        self.ask_ai_btn.setStyleSheet("""
-            QPushButton { 
-                background: linear-gradient(180deg, #0A84FF 0%, #0055FF 100%);
-                color: #FFFFFF; border-radius: 14px; padding: 8px 18px; font-weight: bold; font-family: 'Segoe UI'; 
-                border: 1px solid #0055FF;
-                border-top: 1px solid rgba(255, 255, 255, 0.4);
-                border-bottom: 2px solid #003399;
+        # Главная кнопка: 3D, переливающийся фиолетово-синий градиент и пружина
+        self.ask_ai_btn.setIconSize(QSize(18, 18))
+        mind_fx.shimmer(self.ask_ai_btn, selector="QPushButton", extra="""
+                color: #FFFFFF; border-radius: 14px; padding: 8px 18px; font-weight: bold; font-family: 'Segoe UI';
+                border: 0;
+                border-top: 1px solid rgba(255, 255, 255, 0.45);
+                border-bottom: 3px solid rgba(20, 10, 60, 0.55);
             }
-            QPushButton:hover { background: linear-gradient(180deg, #1A94FF 0%, #0066FF 100%); }
+            QPushButton:pressed { border-top: 3px solid rgba(20, 10, 60, 0.55); border-bottom: 1px solid rgba(255, 255, 255, 0.3); }
         """)
+        mind_fx.bounce_on_hover(self.ask_ai_btn)
 
         self.toolbar.addWidget(self.back_btn)
         self.toolbar.addWidget(self.forward_btn)
@@ -227,8 +238,8 @@ class WebTab(QWidget):
         self.progress.setMaximumHeight(2)
         self.progress.setTextVisible(False)
         self.progress.setStyleSheet("""
-            QProgressBar { border: none; background: #16161D; }
-            QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0A84FF, stop:1 #00FFD1); }
+            QProgressBar { border: none; background: #0f0f1a; }
+            QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #a46cf0, stop:0.33 #7c66df, stop:0.67 #5b8dee, stop:1 #49b3f7); }
         """)
         self.layout.addWidget(self.progress)
 
@@ -257,16 +268,16 @@ class WebTab(QWidget):
 
     def handoff_menu(self):
         menu = QMenu(self)
-        menu.setStyleSheet("QMenu { background: #16161D; color: #E2E2E2; border: 1px solid #282833; padding: 6px; }"
-                           "QMenu::item { padding: 6px 16px; border-radius: 6px; }"
-                           "QMenu::item:selected { background: #0A84FF; }")
-        send = menu.addAction("Отправить вкладку на мои устройства")
+        menu.setStyleSheet("QMenu { background: #141421; color: #E2E2E2; border: 1px solid #1c1c2e; border-radius: 10px; padding: 6px; }"
+                           "QMenu::item { padding: 6px 16px 6px 10px; border-radius: 6px; }"
+                           "QMenu::item:selected { background: " + mind_fx.GRADIENT + "; color: #FFFFFF; }")
+        send = menu.addAction(mind_fx.icon("send"), "Отправить вкладку на мои устройства")
         incoming = continuity.incoming()
         if incoming:
             menu.addSeparator()
             for act in incoming:
                 title = (act.get("title") or act["url"])[:60]
-                item = menu.addAction(f"⇄ {title} — с «{act.get('from', '?')}»")
+                item = menu.addAction(mind_fx.icon("devices"), f"{title} — с «{act.get('from', '?')}»")
                 item.triggered.connect(lambda _=False, u=act["url"]: self.navigate_to(u))
         chosen = menu.exec(self.handoff_btn.mapToGlobal(self.handoff_btn.rect().bottomLeft()))
         if chosen is send:
@@ -306,13 +317,24 @@ class WebTab(QWidget):
             self.monitor.log_activity(url)
             self.webview.setUrl(QUrl(url))
         else:
-            self.webview.setHtml(f"<html><body style='background-color:#0D0D12; color:#FF3B30; font-family:sans-serif; text-align:center; margin-top: 150px;'><h1>ДОСТУП ЗАПРЕЩЕН</h1><p>Домен <b>{url}</b> заблокирован корпоративной политикой безопасности ITIS.</p></body></html>")
+            # Страница блокировки в стиле Mind: иконка-щит с градиентом, переливающийся заголовок
+            mind_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mind")
+            self.webview.setHtml(
+                "<html><head><link rel='stylesheet' href='mind-ui.css'></head>"
+                "<body style='background:#09090f; color:#E2E2E2; font-family:Segoe UI, sans-serif; text-align:center; margin-top:140px;'>"
+                "<div class='mt-bounce-in'><i class='mi mi-shield' style='width:64px;height:64px'></i>"
+                "<h1 class='mt-gradient-text' style='letter-spacing:2px'>ДОСТУП ЗАПРЕЩЁН</h1>"
+                f"<p>Домен <b>{url}</b> заблокирован корпоративной политикой безопасности ITIS.</p></div></body></html>",
+                QUrl.fromLocalFile(mind_dir + os.sep))
+            self._blocked_url = url  # адресная строка показывает заблокированный домен, а не служебный путь
             self.url_bar.setText(url)
 
     def update_url_bar(self, q):
         url_str = q.toString()
         if "start_page.html" in url_str and url_str.startswith("file:///"):
             self.url_bar.clear()
+        elif url_str.startswith("file:///") and url_str.rstrip("/").endswith("/mind") and getattr(self, "_blocked_url", None):
+            self.url_bar.setText(self._blocked_url)
         else:
             self.url_bar.setText(url_str)
             self.url_bar.setCursorPosition(0)
@@ -337,12 +359,16 @@ class WebTab(QWidget):
 # MAIN WINDOW & AI AGENT
 # ==========================================
 class ITISBrowserApp(QMainWindow):
+    # Стили строки статуса ассистента (цвета палитры Mind)
+    STATUS_READY = "color: #5b8dee; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;"
+    STATUS_BUSY = "color: #a46cf0; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;"
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ITIS - Intelligence Browser")
         self.setWindowIcon(QIcon("logo.png"))
         self.resize(1600, 900)
-        self.setStyleSheet("background-color: #0D0D12; color: #E2E2E2; font-family: 'Segoe UI', sans-serif;")
+        self.setStyleSheet("background-color: #09090f; color: #E2E2E2; font-family: 'Segoe UI', sans-serif;")
 
         self.monitor = CorporateMonitor()
         
@@ -352,7 +378,7 @@ class ITISBrowserApp(QMainWindow):
 
         # Main layout splitter
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.splitter.setStyleSheet("QSplitter::handle { background-color: #282833; width: 1px; }")
+        self.splitter.setStyleSheet("QSplitter::handle { background-color: #1c1c2e; width: 1px; }")
         self.setCentralWidget(self.splitter)
 
         # Tab Widget for Browser
@@ -361,14 +387,20 @@ class ITISBrowserApp(QMainWindow):
         self.tabs.tabCloseRequested.connect(self.close_tab)
         self.tabs.setStyleSheet("""
             QTabWidget::pane { border: none; }
-            QTabBar::tab { background: #0D0D12; color: #7A7A8C; padding: 12px 24px; border: none; font-size: 13px; font-weight: 500;}
-            QTabBar::tab:selected { background: #16161D; color: #FFFFFF; border-top: 2px solid #0A84FF; border-top-left-radius: 6px; border-top-right-radius: 6px;}
-            QTabBar::tab:hover:!selected { background: #1C1C24; color: #E2E2E2; }
-        """)
+            QTabBar::tab { background: #09090f; color: #7A7A8C; padding: 12px 24px; border: none; font-size: 13px; font-weight: 500;}
+            QTabBar::tab:selected { background: #0f0f1a; color: #FFFFFF; border-top: 2px solid #7c66df; border-top-left-radius: 10px; border-top-right-radius: 10px;}
+            QTabBar::tab:hover:!selected { background: #141421; color: #E2E2E2; }
+            QTabBar::close-button { image: url(%s); subcontrol-position: right; }
+            QTabBar::close-button:hover { background: rgba(155, 93, 229, 0.2); border-radius: 4px; }
+        """ % os.path.join(os.path.dirname(os.path.abspath(__file__)), "mind", "icons", "close.svg").replace("\\", "/"))
         
-        # Add new tab button to tab bar
-        self.add_tab_btn = QPushButton("+")
-        self.add_tab_btn.setStyleSheet("QPushButton { background: transparent; color: #7A7A8C; font-weight: bold; font-size: 18px; padding: 8px 12px; } QPushButton:hover { color: #FFFFFF; }")
+        # Кнопка новой вкладки — иконка Mind с пружиной
+        self.add_tab_btn = QPushButton()
+        self.add_tab_btn.setIcon(mind_fx.icon("plus"))
+        self.add_tab_btn.setIconSize(QSize(20, 20))
+        self.add_tab_btn.setToolTip("Новая вкладка")
+        self.add_tab_btn.setStyleSheet("QPushButton { background: transparent; border: none; padding: 8px 12px; border-radius: 10px; } QPushButton:hover { background: rgba(155, 93, 229, 0.16); }")
+        mind_fx.bounce_on_hover(self.add_tab_btn)
         self.add_tab_btn.clicked.connect(self.add_new_tab)
         self.tabs.setCornerWidget(self.add_tab_btn, Qt.Corner.TopRightCorner)
 
@@ -376,29 +408,46 @@ class ITISBrowserApp(QMainWindow):
 
         # AI Agent Panel
         self.ai_panel = QWidget()
-        self.ai_panel.setStyleSheet("background-color: #16161D;")
+        self.ai_panel.setStyleSheet("background-color: #0f0f1a;")
         self.ai_layout = QVBoxLayout(self.ai_panel)
         self.ai_layout.setContentsMargins(20, 20, 20, 20)
         self.ai_layout.setSpacing(15)
         
-        # Header
-        self.ai_header = QLabel("⚡ ИИ-Ассистент ITIS")
+        # Заголовок: иконка Mind + переливающийся градиентный текст
+        header_row = QHBoxLayout()
+        header_row.setSpacing(8)
+        self.ai_header_icon = QLabel()
+        self.ai_header_icon.setPixmap(mind_fx.pixmap("bolt", 48).scaled(
+            22, 22, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.ai_header_icon.setStyleSheet("background: transparent;")
+        self.ai_header = QLabel("ИИ-Ассистент ITIS")
         self.ai_header.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
-        self.ai_header.setStyleSheet("color: #FFFFFF; padding-bottom: 5px;")
-        self.ai_layout.addWidget(self.ai_header)
+        mind_fx.shimmer(self.ai_header, prop="color", extra="background: transparent; padding-bottom: 2px;")
+        header_row.addWidget(self.ai_header_icon)
+        header_row.addWidget(self.ai_header, 1)
+        self.ai_layout.addLayout(header_row)
         
-        # Status Label
-        self.ai_status = QLabel("● Готов")
-        self.ai_status.setStyleSheet("color: #00FFD1; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;")
-        self.ai_layout.addWidget(self.ai_status)
+        # Статус: точка-иконка Mind + текст
+        status_row = QHBoxLayout()
+        status_row.setSpacing(6)
+        self.ai_status_icon = QLabel()
+        self.ai_status_icon.setPixmap(mind_fx.pixmap("dot", 48).scaled(
+            12, 12, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.ai_status_icon.setStyleSheet("background: transparent;")
+        self.ai_status = QLabel("Готов")
+        self.ai_status.setStyleSheet(self.STATUS_READY)
+        status_row.addWidget(self.ai_status_icon)
+        status_row.addWidget(self.ai_status, 1)
+        self.ai_layout.addLayout(status_row)
         
         # Chat log
         self.ai_chat_log = QTextEdit()
         self.ai_chat_log.setReadOnly(True)
         self.ai_chat_log.setStyleSheet("""
             QTextEdit {
-                background-color: #0D0D12; border: 1px solid #282833; 
-                padding: 15px; border-radius: 12px; font-size: 13px; line-height: 1.5;
+                background-color: #09090f; border: 1px solid #1c1c2e;
+                border-top: 1px solid rgba(255, 255, 255, 0.06);
+                padding: 15px; border-radius: 16px; font-size: 13px; line-height: 1.5;
             }
         """)
         self.ai_layout.addWidget(self.ai_chat_log)
@@ -409,21 +458,27 @@ class ITISBrowserApp(QMainWindow):
         self.ai_input.setPlaceholderText("Спросите что-нибудь об этой странице...")
         self.ai_input.setStyleSheet("""
             QLineEdit {
-                background-color: #0D0D12; border: 1px solid #282833; 
+                background-color: #09090f; border: 1px solid #1c1c2e;
                 padding: 12px 15px; border-radius: 20px; color: #FFFFFF; font-size: 13px;
             }
-            QLineEdit:focus { border: 1px solid #0A84FF; }
+            QLineEdit:focus { border: 1px solid #5b8dee; }
         """)
         self.input_layout.addWidget(self.ai_input)
         
-        self.ai_send_btn = QPushButton("➤")
-        self.ai_send_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #0A84FF; color: white; border-radius: 20px; 
-                min-width: 40px; max-width: 40px; min-height: 40px; font-size: 16px;
+        # Кнопка отправки: круглая 3D-кнопка с переливом, белая иконка Mind
+        self.ai_send_btn = QPushButton()
+        self.ai_send_btn.setIcon(mind_fx.icon("send", white=True))
+        self.ai_send_btn.setIconSize(QSize(18, 18))
+        self.ai_send_btn.setToolTip("Отправить")
+        mind_fx.shimmer(self.ai_send_btn, selector="QPushButton", extra="""
+                border-radius: 20px; border: 0;
+                border-top: 1px solid rgba(255, 255, 255, 0.45);
+                border-bottom: 3px solid rgba(20, 10, 60, 0.55);
+                min-width: 40px; max-width: 40px; min-height: 40px;
             }
-            QPushButton:hover { background-color: #0070DF; }
+            QPushButton:disabled { background: #1c1c2e; border: 0; }
         """)
+        mind_fx.bounce_on_hover(self.ai_send_btn)
         self.input_layout.addWidget(self.ai_send_btn)
         
         self.ai_layout.addLayout(self.input_layout)
@@ -466,8 +521,8 @@ class ITISBrowserApp(QMainWindow):
         self.ai_append("Вы", user_text)
         self.ai_input.clear()
         
-        self.ai_status.setText("● Думает...")
-        self.ai_status.setStyleSheet("color: #FF9500; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;")
+        self.ai_status.setText("Думает...")
+        self.ai_status.setStyleSheet(self.STATUS_BUSY)
         self.ai_send_btn.setEnabled(False)
         
         # Always use toPlainText — it works on every page reliably (no CSP issues)
@@ -502,8 +557,8 @@ class ITISBrowserApp(QMainWindow):
         if clean_response:
             self.ai_append("ИИ", clean_response)
             
-        self.ai_status.setText("● Готов")
-        self.ai_status.setStyleSheet("color: #00FFD1; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;")
+        self.ai_status.setText("Готов")
+        self.ai_status.setStyleSheet(self.STATUS_READY)
         self.ai_send_btn.setEnabled(True)
         
         current_tab = self.tabs.currentWidget()
@@ -586,9 +641,9 @@ class ITISBrowserApp(QMainWindow):
     def ai_append(self, sender, text):
         color = "#FFFFFF"
         if sender == "Вы":
-            color = "#00FFD1"
+            color = "#49b3f7"
         elif sender == "ИИ":
-            color = "#0A84FF"
+            color = "#a46cf0"
         elif sender == "Система":
             color = "#FF9500"
             
